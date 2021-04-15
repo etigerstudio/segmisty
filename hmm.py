@@ -20,7 +20,10 @@ class HMM:
         pass
 
     def predict(self, observations):
-        pass
+        states = []
+        for ob in observations:
+            states.append(self.__perform_viterbi(ob))
+        return states
 
     def save(self, filename):
         pass
@@ -72,3 +75,23 @@ class HMM:
         self.Pi_f = np.zeros(4, dtype=int)
         self.A_f = np.zeros((4, 4), dtype=int)
         self.B_f = np.zeros((4, HMM.OUTPUT_COUNT), dtype=int)
+
+    def __perform_viterbi(self, observation):
+        ob_len = len(observation)
+        psi = np.zeros((ob_len - 1, 4), dtype=int)
+
+        delta = np.zeros(4)
+        delta = (self.Pi * self.B[:, observation[0]]).reshape(-1, 1)
+        for t in range(1, ob_len):
+            p = delta * self.A
+            psi[t - 1] = p.argmax(axis=0)
+            delta = (p.max(axis=0) * self.B[:, observation[t]]).reshape(-1, 1)
+
+        s = delta.argmax()
+        states = [s]
+        for t in range(ob_len - 1, 0, -1):
+            s = psi[t - 1][s]
+            states.append(s)
+
+        states.reverse()
+        return states
