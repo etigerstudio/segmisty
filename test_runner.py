@@ -64,6 +64,14 @@ if __name__ == '__main__':
   # print(list(reversed(model.predict([utils.string_to_ints(reversed("武汉市长江大桥"))]))))
 
 
+ elif unit == "hmm-train":
+  model = hmm.HMM()
+  model.train(*utils.read_hmm_tagged_sentences("training.txt"))
+  _, observations = utils.read_hmm_tagged_sentences("training.txt")
+  predicted_states = model.predict(observations)
+  utils.export_hmm_tagged_sentences(predicted_states, observations, "hmm_training_result.txt")
+
+
  elif unit == "hmm-export":
   model = hmm.HMM()
   model.train(*utils.read_hmm_tagged_sentences("training.txt"))

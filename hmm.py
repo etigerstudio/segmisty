@@ -78,6 +78,9 @@ class HMM:
 
     def __perform_viterbi(self, observation):
         ob_len = len(observation)
+        if ob_len == 0:
+            return []
+
         psi = np.zeros((ob_len - 1, 4), dtype=int)
 
         delta = np.zeros(4)
