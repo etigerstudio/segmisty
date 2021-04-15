@@ -43,12 +43,14 @@ def __tokenize_one_pass(vocabulary, max_word_len, sentence, is_forward):
                 else sentence[s_len - cur_pos - cur_word_len:s_len - cur_pos]  # 当前待匹配单词
 
             if cur_word_len == 1 or cur_word in vocabulary:  # 单字词 或 词汇表中存在当前单词
-                s_words.append(cur_word) if is_forward else s_words.insert(0, cur_word)  # 匹配结束，记录单词
+                s_words.append(cur_word)  # 匹配结束，记录单词
                 cur_pos += cur_word_len
                 break
             else:
                 cur_word_len -= 1
 
+    if not is_forward:
+        s_words.reverse()
     return s_words
 
 
@@ -61,4 +63,4 @@ def __choose_better_tokenization(t1, t2):
     else:  # l1 == l2
         s_count1 = len([None for s in t1 if len(t1) == 1])  # t1中单字词数量
         s_count2 = len([None for s in t2 if len(t2) == 1])
-        return t1 if s_count1 >= s_count2 else t2
+        return t1 if s_count1 < s_count2 else t2

@@ -11,9 +11,10 @@ def read_plain_sentences(filename):
 
 def read_vocabulary_dataset(filename):
     with open(filename, "r") as f:
-        return f.read().splitlines()
+        return set(f.read().splitlines())
 
 
-# def set_item(obj, key, value):
-#     if obj[key] is not None:
-#         obj[key] =
+def export_sentences(sentences, filename):
+    content = '\n'.join(['  '.join(s) for s in sentences])
+    with open(filename, "w") as f:
+        f.write(content)

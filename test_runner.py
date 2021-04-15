@@ -8,7 +8,6 @@ if __name__ == '__main__':
 
     if unit == "mm-short":
         v = utils.read_vocabulary_dataset("training_vocab.txt")
-        # # s = utils.read_plain_sentences("test.txt")
         s = utils.read_plain_sentences("short.txt")
 
         results = mm.tokenize(v, s, mode=mm.MMMode.Forward)
@@ -20,6 +19,19 @@ if __name__ == '__main__':
         results = mm.tokenize(v, s, mode=mm.MMMode.Bidirectional)
         print("Bi", results)
 
+    elif unit == "mm-export":
+        v = utils.read_vocabulary_dataset("training_vocab.txt")
+        s = utils.read_plain_sentences("test.txt")
+
+        results = mm.tokenize(v, s, mode=mm.MMMode.Forward)
+        utils.export_sentences(results, "fmm_result.txt")
+
+        results = mm.tokenize(v, s, mode=mm.MMMode.Reverse)
+        utils.export_sentences(results, "rmm_result.txt")
+
+        results = mm.tokenize(v, s, mode=mm.MMMode.Bidirectional)
+        utils.export_sentences(results, "bimm_result.txt")
+
 
     elif unit == "mm-changjiang":
         v = ["武汉", "市长", "长江大桥"]
@@ -28,7 +40,7 @@ if __name__ == '__main__':
         results = mm.tokenize(v, s, mode=mm.MMMode.Forward)
         print("F", results)
 
-        results = mm.tokenize(v, s, mode=mm.MMMode.Reverse)
+        model.train(states, observations)        results = mm.tokenize(v, s, mode=mm.MMMode.Reverse)
         print("R", results)
 
         results = mm.tokenize(v, s, mode=mm.MMMode.Bidirectional)
@@ -40,4 +52,3 @@ if __name__ == '__main__':
         observations = [[53966, 23], [5966, 43], [43, 42, 41, 40], [99]]
 
         model = hmm.HMM()
-        model.train(states, observations)
