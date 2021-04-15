@@ -12,3 +12,8 @@ def read_plain_sentences(filename):
 def read_vocabulary_dataset(filename):
     with open(filename, "r") as f:
         return f.read().splitlines()
+
+
+# def set_item(obj, key, value):
+#     if obj[key] is not None:
+#         obj[key] =
