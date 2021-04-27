@@ -2,6 +2,11 @@
 # Utilities 工具函数
 # ========================================
 
+from collections import defaultdict
+
+BOS = " BOS "
+EOS = " EOS "
+
 def read_plain_sentences(filename):
     with open(filename, "r") as f:
         lines = f.read().splitlines()
@@ -12,6 +17,29 @@ def read_plain_sentences(filename):
 def read_vocabulary_dataset(filename):
     with open(filename, "r") as f:
         return set(f.read().splitlines())
+
+
+def read_bigram_words(filename):
+    with open(filename, "r") as f:
+        lines = f.read().splitlines()
+        lines = [l.split('  ') for l in lines]
+
+        uni_freq = defaultdict(int)
+        for l in lines:
+            for w in l:
+                uni_freq[w] += 1
+        uni_freq[BOS] = len(lines)
+        uni_freq[EOS] = len(lines)
+                
+        bi_freq = defaultdict(lambda: defaultdict(int))
+        for l in lines:
+            if len(l) > 0:
+                bi_freq[BOS][l[0]] += 1
+                bi_freq[l[-1]][EOS] += 1
+                for i in range(1, len(l)):
+                    bi_freq[l[i - 1]][l[i]] += 1
+
+        return uni_freq, bi_freq
 
 
 def export_plain_sentences(sentences, filename):
