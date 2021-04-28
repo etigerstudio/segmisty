@@ -2,8 +2,11 @@ import utils
 import mm
 import hmm
 import bigram
+import time
 
 if __name__ == '__main__':
+
+    start_time = time.time()
     unit = "bigram-export"
 
     if unit == "mm-short":
@@ -94,26 +97,28 @@ if __name__ == '__main__':
         s = utils.read_plain_sentences("test.txt")
 
         uni_freq, bi_freq = utils.read_bigram_words("training.txt")
-        bi_gram = bigram.BiGram(uni_freq, bi_freq, enable_numeric_segmenting=True)
+        bi_gram = bigram.BiGram(uni_freq, bi_freq, enable_atomic_segmentation=True)
         results = bi_gram.segment_sentences(s)
         utils.export_plain_sentences(results, "bigram_result.txt")
 
 
     elif unit == "atom-segmentation-test":
-        print(utils.try_atom_segmentation("12") == 2)
-        print(utils.try_atom_segmentation("1.2") == 3)
-        print(utils.try_atom_segmentation(".2") is None)
-        print(utils.try_atom_segmentation("二○○一年") == 5)
-        print(utils.try_atom_segmentation("2003年") == 5)
-        print(utils.try_atom_segmentation("九月") == 2)
-        print(utils.try_atom_segmentation("9月") == 2)
-        print(utils.try_atom_segmentation("到2003年") is None)
-        print(utils.try_atom_segmentation("到9月") is None)
-        print(utils.try_atom_segmentation("12%") == 3)
-        print(utils.try_atom_segmentation("1.2％") == 4)
-        print(utils.try_atom_segmentation("百分之十六") == 5)
-        print(utils.try_atom_segmentation("百分之一百零三点六") == 9)
-        print(utils.try_atom_segmentation("www.in－paku.go.jp") == 17)
-        print(utils.try_atom_segmentation("caibian3＠peopledaily．com．cn") == 27)
-        print(utils.try_atom_segmentation("happynewyear.txt.vbs") == 20)
-        print(utils.try_atom_segmentation("AM21B") == 5)
+        print(utils.try_atomic_segmentation("12") == 2)
+        print(utils.try_atomic_segmentation("1.2") == 3)
+        print(utils.try_atomic_segmentation(".2") is None)
+        print(utils.try_atomic_segmentation("二○○一年") == 5)
+        print(utils.try_atomic_segmentation("2003年") == 5)
+        print(utils.try_atomic_segmentation("九月") == 2)
+        print(utils.try_atomic_segmentation("9月") == 2)
+        print(utils.try_atomic_segmentation("到2003年") is None)
+        print(utils.try_atomic_segmentation("到9月") is None)
+        print(utils.try_atomic_segmentation("12%") == 3)
+        print(utils.try_atomic_segmentation("1.2％") == 4)
+        print(utils.try_atomic_segmentation("百分之十六") == 5)
+        print(utils.try_atomic_segmentation("百分之一百零三点六") == 9)
+        print(utils.try_atomic_segmentation("www.in－paku.go.jp") == 17)
+        print(utils.try_atomic_segmentation("caibian3＠peopledaily．com．cn") == 27)
+        print(utils.try_atomic_segmentation("happynewyear.txt.vbs") == 20)
+        print(utils.try_atomic_segmentation("AM21B") == 5)
+
+    print("unit: %s - %s seconds" % (unit, time.time() - start_time))

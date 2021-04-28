@@ -2,61 +2,52 @@
 # Bi-gram 二元语法分词
 # ========================================
 
-from utils import BOS, EOS, NUMBER_CHARS
+from utils import BOS, EOS
 from math import log
 from sys import maxsize
 import utils
 
 
 class BiGram:
-    def __init__(self, uni_freq, bi_freq, enable_numeric_segmenting=True):
+    def __init__(self, uni_freq, bi_freq, enable_atomic_segmentation=True):
         self.uni_freq = uni_freq
         self.bi_freq = bi_freq
         self.vocabulary = set(uni_freq.keys())
-        self.max_word_len = max([len(w) for w in self.vocabulary])
-        # self.max_word_len = 10
+        self.vocab_max_word_len = max([len(w) for w in self.vocabulary])
         self.total_word_count = len(uni_freq)
         self.total_word_frequency = sum(uni_freq.values())
-        self.enable_numeric_segmenting = enable_numeric_segmenting
+        self.enable_atomic_segmentation = enable_atomic_segmentation
 
         self.SMOOTHING_LAMBDA = 0.1
         self.SMOOTHING_MU = 1 / self.total_word_frequency + 0.00001
 
     def coarse_word_net_segment(self, sentence, vocabulary):
         sen_len = len(sentence)
-        word_net = [[] for _ in range(sen_len)]
+        word_net = [{0} for _ in range(sen_len)]
         i = 0
 
         while i < sen_len:
-            # 数字切分
-            if self.enable_numeric_segmenting and sentence[i] in NUMBER_CHARS:
-                seg = utils.try_numeric_segmenting(sentence[i:])
+            # 原子切分，目前包含数字、英文规则
+            if self.enable_atomic_segmentation:
+                seg = utils.try_atomic_segmentation(sentence[i:])
                 if seg:
-                    word_net[i].append(sentence[i:i + seg])  # 成功切分数字
+                    word_net[i].add(seg)  # 成功切分数字
                     i += seg
                     continue
                 else:
-                    word_net[i].append(sentence[i])  # 未成功切分
+                    word_net[i].add(1)  # 未成功切分
             else:
-                word_net[i].append(sentence[i])  # 默认切分单字词
+                word_net[i].add(1)  # 默认切分单字词
 
-            for j in range(2, min(self.max_word_len, sen_len - i) + 1):
+            for j in range(2, min(self.vocab_max_word_len, sen_len - i) + 1):
                 if sentence[i:i + j] in vocabulary:
-                    word_net[i].append(sentence[i:i + j])
+                    word_net[i].add(j)
 
             i += 1
 
-        word_net.insert(0, [BOS])
-        word_net.append([EOS])
+        word_net.insert(0, {1})
+        word_net.append({1})
         return word_net
-
-    def calc_plain_probability(self, w1, w2):
-        if self.bi_freq[w1][w2] == 0:
-            return -log(0.0001)  # 将0替换为较小概率
-
-        p = -log(self.bi_freq[w1][w2] / self.uni_freq[w1])
-        # print(w1, w2, p)
-        return p
 
     def calc_smoothed_probability(self, w1, w2):
         """
@@ -64,8 +55,10 @@ class BiGram:
         P经验平滑公式；P的总和等于1
         """
         return \
-            -log((1 - self.SMOOTHING_LAMBDA) * ((1 - self.SMOOTHING_MU) * self.bi_freq[w1][w2] / (self.uni_freq[w1] + self.SMOOTHING_MU)) \
-                 + self.SMOOTHING_LAMBDA * ((self.uni_freq[w2] + 1) / (self.total_word_frequency + self.total_word_count)))
+            -log((1 - self.SMOOTHING_LAMBDA) * (
+                        (1 - self.SMOOTHING_MU) * self.bi_freq[w1][w2] / (self.uni_freq[w1] + self.SMOOTHING_MU)) \
+                 + self.SMOOTHING_LAMBDA * (
+                             (self.uni_freq[w2] + 1) / (self.total_word_frequency + self.total_word_count)))
 
     @staticmethod
     def dijkstra_shortest_path(graph):
@@ -116,22 +109,32 @@ class BiGram:
 
         return path
 
-    def construct_graph(self, word_net):
+    def construct_graph(self, sentence, word_net):
+        if len(sentence) != len(word_net) - 2:
+            raise ValueError
+
         length = len(word_net)
         graph = [[maxsize for _ in range(length)] for _ in range(length)]
+        net_max_word_len = max([max(s) for s in word_net])
 
         for i in range(1, length):
-            for w2 in word_net[i]:
-                for j in range(1, min(self.max_word_len, i) + 1):
-                    for w1 in word_net[i - j]:
-                        if (len(w1) == j and w1 != BOS) or (j == 1 and w1 == BOS):
-                            # graph[i - j][i] = calc_plain_probability(w1, w2, uni_freq, bi_freq)
-                            graph[i - j][i] = self.calc_smoothed_probability(w1, w2)
-                            # print(f"写入可能分割 w1:{w1} {i - j} w2:{w2} {i} 概率负对数:{graph[i - j][i]}")
+            for l2 in word_net[i]:  # 后词的长度
+                for l1 in range(1, min(net_max_word_len, i) + 1):  # 前词的长度
+                    if l1 in word_net[i - l1]:
+                        if i == 1:  # 句首特殊情况
+                            graph[i - l1][i] = self.calc_smoothed_probability(BOS, sentence[i - 1:i + l2 - 1])
+                            # print(f"写入可能分割 w1:{BOS} {i - l1} w2:{sentence[i - 1:i + l2 - 1]} {i} 概率负对数:{graph[i - l1][i]}")
+                        elif i == length - 1:  # 句尾特殊情况
+                            graph[i - l1][i] = self.calc_smoothed_probability(sentence[i - l1 - 1:i - 1], EOS)
+                            # print(f"写入可能分割 w1:{sentence[i - l1 - 1:i - 1]} {i - l1} w2:{EOS} {i} 概率负对数:{graph[i - l1][i]}")
+                        else:  # 句中标准情况
+                            graph[i - l1][i] = self.calc_smoothed_probability(sentence[i - l1 - 1:i - 1], sentence[i - 1:i + l2 - 1])
+                            # print(f"写入可能分割 w1:{sentence[i - l1 - 1:i - 1]} {i - l1} w2:{sentence[i - 1:i + l2 - 1]} {i} 概率负对数:{graph[i - l1][i]}")
 
         return graph
 
-    def convert_path_to_segmentation(self, sentence, path):
+    @staticmethod
+    def convert_path_to_segmentation(sentence, path):
         seg = []
 
         for i in range(2, len(path)):
@@ -146,7 +149,7 @@ class BiGram:
             if i % 20 == 0:
                 print(f"{i} / {len(sentences)}", end='\r')
             word_net = self.coarse_word_net_segment(sentences[i], self.vocabulary)
-            graph = self.construct_graph(word_net)
+            graph = self.construct_graph(sentences[i], word_net)
             path = self.dijkstra_shortest_path(graph)
             seg = self.convert_path_to_segmentation(sentences[i], path)
             results.append(seg)

@@ -110,7 +110,7 @@ def ints_to_string(ints, encoding='gbk'):
     return string
 
 
-def try_atom_segmentation(sentence):
+def try_atomic_segmentation(sentence):
     if sentence[0] in NUMBER_CHARS:
         exp = numeric_re
     elif sentence[0] in ENGLISH_CHARS:
