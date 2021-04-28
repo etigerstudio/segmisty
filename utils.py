@@ -7,8 +7,13 @@ import re
 
 BOS = " BOS "
 EOS = " EOS "
+# 正则规则测试见https://regexr.com/5rqrb
 numeric_re = re.compile("^[十百千万亿]分之[零一二三四五六七八九十百千万亿]+(点[零一二三四五六七八九十])?|^[0-9零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟]+[年月日时分秒]|^[-－]?\\d+(.\\d)?[%％]?")
 NUMBER_CHARS = set("0123456789零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟")
+# 正则规则测试见https://regexr.com/5rr5u
+english_re = re.compile("^[\w－\-．.／/:;：；<=>?＜＝＞？@＠_＿\\\\]+", flags=re.ASCII)
+ENGLISH_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
 
 def read_plain_sentences(filename):
     with open(filename, "r") as f:
@@ -105,6 +110,16 @@ def ints_to_string(ints, encoding='gbk'):
     return string
 
 
-def try_numeric_segmenting(word):
-    match = numeric_re.match(word)
-    return match.span()[1] if match else None
+def try_atom_segmentation(sentence):
+    if sentence[0] in NUMBER_CHARS:
+        exp = numeric_re
+    elif sentence[0] in ENGLISH_CHARS:
+        exp = english_re
+    else:
+        return
+
+    match = exp.match(sentence)
+    if match:
+        return match.span()[1]
+    else:
+        return
