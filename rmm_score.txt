@@ -1,0 +1,7 @@
+RECALL:	0.909
+PRECISION:	0.845
+F1 :	0.876
+
+OOV Rate:	0.058
+OOV Recall:	0.069
+IV Recall:	0.960
