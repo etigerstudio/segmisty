@@ -3,9 +3,12 @@
 # ========================================
 
 from collections import defaultdict
+import re
 
 BOS = " BOS "
 EOS = " EOS "
+numeric_re = re.compile("^[十百千万亿]分之[零一二三四五六七八九十百千万亿]+(点[零一二三四五六七八九十])?|^[0-9零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟]+[年月日时分秒]|^[-－]?\\d+(.\\d)?[%％]?")
+NUMBER_CHARS = set("0123456789零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟")
 
 def read_plain_sentences(filename):
     with open(filename, "r") as f:
@@ -100,3 +103,8 @@ def ints_to_string(ints, encoding='gbk'):
     for i in ints:
         string += i.to_bytes((i.bit_length() + 7) // 8, byteorder='little').decode(encoding)
     return string
+
+
+def try_numeric_segmenting(word):
+    match = numeric_re.match(word)
+    return match.span()[1] if match else None

@@ -2,32 +2,50 @@
 # Bi-gram 二元语法分词
 # ========================================
 
-from utils import BOS, EOS
+from utils import BOS, EOS, NUMBER_CHARS
 from math import log
 from sys import maxsize
+import utils
 
 
 class BiGram:
-    def __init__(self, uni_freq, bi_freq):
+    def __init__(self, uni_freq, bi_freq, enable_numeric_segmenting=True):
         self.uni_freq = uni_freq
         self.bi_freq = bi_freq
         self.vocabulary = set(uni_freq.keys())
         self.max_word_len = max([len(w) for w in self.vocabulary])
+        # self.max_word_len = 10
         self.total_word_count = len(uni_freq)
         self.total_word_frequency = sum(uni_freq.values())
+        self.enable_numeric_segmenting = enable_numeric_segmenting
 
         self.SMOOTHING_LAMBDA = 0.1
         self.SMOOTHING_MU = 1 / self.total_word_frequency + 0.00001
 
     def coarse_word_net_segment(self, sentence, vocabulary):
         sen_len = len(sentence)
-        word_net = []
-        for i in range(0, len(sentence)):
-            word_net.append([])
-            word_net[i].append(sentence[i])  # 默认切分单字词
+        word_net = [[] for _ in range(sen_len)]
+        i = 0
+
+        while i < sen_len:
+            # 数字切分
+            if self.enable_numeric_segmenting and sentence[i] in NUMBER_CHARS:
+                seg = utils.try_numeric_segmenting(sentence[i:])
+                if seg:
+                    word_net[i].append(sentence[i:i + seg])  # 成功切分数字
+                    i += seg
+                    continue
+                else:
+                    word_net[i].append(sentence[i])  # 未成功切分
+            else:
+                word_net[i].append(sentence[i])  # 默认切分单字词
+
             for j in range(2, min(self.max_word_len, sen_len - i) + 1):
                 if sentence[i:i + j] in vocabulary:
                     word_net[i].append(sentence[i:i + j])
+
+            i += 1
+
         word_net.insert(0, [BOS])
         word_net.append([EOS])
         return word_net
@@ -124,11 +142,13 @@ class BiGram:
     def segment_sentences(self, sentences):
         results = []
 
-        for sen in sentences:
-            word_net = self.coarse_word_net_segment(sen, self.vocabulary)
+        for i in range(len(sentences)):
+            if i % 20 == 0:
+                print(f"{i} / {len(sentences)}", end='\r')
+            word_net = self.coarse_word_net_segment(sentences[i], self.vocabulary)
             graph = self.construct_graph(word_net)
             path = self.dijkstra_shortest_path(graph)
-            seg = self.convert_path_to_segmentation(sen, path)
+            seg = self.convert_path_to_segmentation(sentences[i], path)
             results.append(seg)
 
         return results
