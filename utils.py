@@ -7,6 +7,7 @@ import re
 
 BOS = " BOS "
 EOS = " EOS "
+NA = "#"
 # 正则规则测试见https://regexr.com/5rqrb
 numeric_re = re.compile("^[十百千万亿]分之[零一二三四五六七八九十百千万亿]+(点[零一二三四五六七八九十])?|^[0-9零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟]+[年月日时分秒]|^[-－]?\\d+(.\\d)?[%％]?")
 NUMBER_CHARS = set("0123456789零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟")
@@ -71,7 +72,8 @@ def read_hmm_tagged_sentences(filename):
                     s.append(3)  # S
                 else:
                     s.extend([0, *([1] * (w_len - 2)), 2])  # B, M, ... , E
-                ob.extend(string_to_ints(w))
+                # ob.extend(string_to_ints(w))
+                ob.extend(w)
 
             states.append(s)
             observations.append(ob)

@@ -77,10 +77,10 @@ if __name__ == '__main__':
 
     elif unit == "hmm-export":
         model = hmm.HMM()
-        model.train(*utils.read_hmm_tagged_sentences("training.txt"))
-        _, observations = utils.read_hmm_tagged_sentences("test.txt")
+        model.train(*utils.read_hmm_tagged_sentences("msr_training.utf8"))
+        _, observations = utils.read_hmm_tagged_sentences("msr_test.utf8")
         predicted_states = model.predict(observations)
-        utils.export_hmm_tagged_sentences(predicted_states, observations, "hmm_result.txt")
+        utils.export_hmm_tagged_sentences(predicted_states, observations, "msr_hmm_result.txt")
 
 
     elif unit == "bigram-test":
@@ -94,12 +94,12 @@ if __name__ == '__main__':
 
 
     elif unit == "bigram-export":
-        s = utils.read_plain_sentences("test.txt")
+        s = utils.read_plain_sentences("msr_test.utf8")
 
-        uni_freq, bi_freq = utils.read_bigram_words("training.txt")
+        uni_freq, bi_freq = utils.read_bigram_words("msr_training.utf8")
         bi_gram = bigram.BiGram(uni_freq, bi_freq, enable_atomic_segmentation=True)
         results = bi_gram.segment_sentences(s)
-        utils.export_plain_sentences(results, "bigram_result.txt")
+        utils.export_plain_sentences(results, "msr_bigram_result.txt")
 
 
     elif unit == "atom-segmentation-test":

@@ -21,7 +21,7 @@ class BiGram:
         self.SMOOTHING_LAMBDA = 0.1
         self.SMOOTHING_MU = 1 / self.total_word_frequency + 0.00001
 
-    def coarse_word_net_segment(self, sentence, vocabulary):
+    def __coarse_word_net_segment(self, sentence, vocabulary):
         sen_len = len(sentence)
         word_net = [{0} for _ in range(sen_len)]
         i = 0
@@ -49,7 +49,7 @@ class BiGram:
         word_net.append({1})
         return word_net
 
-    def calc_smoothed_probability(self, w1, w2):
+    def __calc_smoothed_probability(self, w1, w2):
         """
         P_smoothed(w2|w1) = (1 - l) * ((1 - m) * c(w1w2) / c(w1) + m) + l * ((c(w2) + 1) / N + |V|)
         P经验平滑公式；P的总和等于1
@@ -61,7 +61,7 @@ class BiGram:
                              (self.uni_freq[w2] + 1) / (self.total_word_frequency + self.total_word_count)))
 
     @staticmethod
-    def dijkstra_shortest_path(graph):
+    def __dijkstra_shortest_path(graph):
         """
         通过Dijkstra算法求解最短路径
 
@@ -109,7 +109,7 @@ class BiGram:
 
         return path
 
-    def construct_graph(self, sentence, word_net):
+    def __construct_graph(self, sentence, word_net):
         if len(sentence) != len(word_net) - 2:
             raise ValueError
 
@@ -122,19 +122,19 @@ class BiGram:
                 for l1 in range(1, min(net_max_word_len, i) + 1):  # 前词的长度
                     if l1 in word_net[i - l1]:
                         if i == 1:  # 句首特殊情况
-                            graph[i - l1][i] = self.calc_smoothed_probability(BOS, sentence[i - 1:i + l2 - 1])
+                            graph[i - l1][i] = self.__calc_smoothed_probability(BOS, sentence[i - 1:i + l2 - 1])
                             # print(f"写入可能分割 w1:{BOS} {i - l1} w2:{sentence[i - 1:i + l2 - 1]} {i} 概率负对数:{graph[i - l1][i]}")
                         elif i == length - 1:  # 句尾特殊情况
-                            graph[i - l1][i] = self.calc_smoothed_probability(sentence[i - l1 - 1:i - 1], EOS)
+                            graph[i - l1][i] = self.__calc_smoothed_probability(sentence[i - l1 - 1:i - 1], EOS)
                             # print(f"写入可能分割 w1:{sentence[i - l1 - 1:i - 1]} {i - l1} w2:{EOS} {i} 概率负对数:{graph[i - l1][i]}")
                         else:  # 句中标准情况
-                            graph[i - l1][i] = self.calc_smoothed_probability(sentence[i - l1 - 1:i - 1], sentence[i - 1:i + l2 - 1])
+                            graph[i - l1][i] = self.__calc_smoothed_probability(sentence[i - l1 - 1:i - 1], sentence[i - 1:i + l2 - 1])
                             # print(f"写入可能分割 w1:{sentence[i - l1 - 1:i - 1]} {i - l1} w2:{sentence[i - 1:i + l2 - 1]} {i} 概率负对数:{graph[i - l1][i]}")
 
         return graph
 
     @staticmethod
-    def convert_path_to_segmentation(sentence, path):
+    def __convert_path_to_segmentation(sentence, path):
         seg = []
 
         for i in range(2, len(path)):
@@ -148,10 +148,10 @@ class BiGram:
         for i in range(len(sentences)):
             if i % 20 == 0:
                 print(f"{i} / {len(sentences)}", end='\r')
-            word_net = self.coarse_word_net_segment(sentences[i], self.vocabulary)
-            graph = self.construct_graph(sentences[i], word_net)
-            path = self.dijkstra_shortest_path(graph)
-            seg = self.convert_path_to_segmentation(sentences[i], path)
+            word_net = self.__coarse_word_net_segment(sentences[i], self.vocabulary)
+            graph = self.__construct_graph(sentences[i], word_net)
+            path = self.__dijkstra_shortest_path(graph)
+            seg = self.__convert_path_to_segmentation(sentences[i], path)
             results.append(seg)
 
         return results
