@@ -6,6 +6,8 @@ from utils import NA, Evaluator
 import json
 import utils
 import time
+from collections import deque
+import os
 
 
 class Perceptron:
@@ -13,11 +15,13 @@ class Perceptron:
         self.w = {}
         self.current_step = 0
         self.name = name
+        self.best_f1 = 0
+        self.saved_models = deque()
 
-    def train(self, sentences, tag_set, max_epoch=100):
+    def train(self, sentences, tag_set, max_epoch=250, evaluate_filename=None):
         # last_f1 = float("-inf")
 
-        for i in range(max_epoch):
+        for i in range(1, max_epoch + 1):
             converged = True
             evaluator = Evaluator()
             for sen, tags in zip(sentences, tag_set):
@@ -37,16 +41,31 @@ class Perceptron:
 
             # print(f"iter:{i}")
             _, _, f1, _, formatted_string = evaluator.get_statistics()
-            print(f"iter:{i} {formatted_string}")
-            if i % 20 == 0:
-                self.export(f"{self.name}-autosave-{time.time()}-{i + 1}.perceptron")
+            print(f"training:{i} {formatted_string}")
+            if evaluate_filename is None:
+                if i % 20 == 0:
+                    self.export(f"{self.name}-autosave-{time.time()}-{i}.perceptron")
+            else:  # 动态保存在验证集上表现好的模型 Dynamically save models based on performance on validation set
+                p, r, f1, elapsed_time, formatted_string = self.evaluate(evaluate_filename)
+                print(f"evaluation:{i} {formatted_string}")
+                if f1 > self.best_f1:
+                    self.best_f1 = f1
+                    save_filename = f"{self.name}-f1{f1:.4}-{time.time()}-{i}.perceptron"
+                    self.saved_models.append(save_filename)
+                    self.export(save_filename)
+                    print(f"saved model f1:{f1} name:{save_filename}")
+                    if len(self.saved_models) > 5:
+                        purge_filename = self.saved_models.popleft()
+                        os.remove(purge_filename)
+                        print(f"purged model name:{purge_filename}")
+
             # if i >= 20 and f1 <= last_f1:
             #     print(f"iter:{i} f1({f1}) is worsened, early-stopping triggered")
             #     break
             # else:
             #     last_f1 = f1
 
-        self.export(f"{self.name}-{time.time()}-{i + 1}.perceptron")
+        self.export(f"{self.name}-{time.time()}-{i}.perceptron")
 
     def predict(self, sentence):
         features = self.__extract_features(sentence)
@@ -199,6 +218,24 @@ class Perceptron:
         with open(filename, "w") as f:
             json.dump(obj, f, ensure_ascii=False)
         print(f"saved to {filename}")
+
+    def evaluate(self, filename, export_results=False):
+        tag_set, sentences = utils.read_sequential_tagged_sentences(filename)
+        predicted_states = []
+        evaluator = utils.Evaluator()
+        for sen, tags in zip(sentences, tag_set):
+            y_predict = self.predict(sen)[0]
+            predict_sen = utils.join_sequential_tagged_sentences([y_predict], [sen])[0]
+            truth_sen = utils.join_sequential_tagged_sentences([tags], [sen])[0]
+            predicted_states.append(y_predict)
+            evaluator.count(truth_sen, predict_sen)
+        p, r, f1, elapsed_time, formatted_string = evaluator.get_statistics()
+        print(f"eval {filename}: {formatted_string}")
+
+        if export_results:
+            utils.export_sequential_tagged_sentences(predicted_states, sentences, "perceptron_pku_61.result.txt")
+
+        return p, r, f1, elapsed_time, formatted_string
 
     @classmethod
     def load(cls, filename, name=None):

@@ -140,7 +140,7 @@ if __name__ == '__main__':
     elif unit == "perceptron-pku":
         p = perceptron.Perceptron()
         tags, sentences = utils.read_sequential_tagged_sentences("training.txt")
-        p.train(sentences, tags)
+        p.train(sentences, tags, evaluate_filename="test.txt")
         print(p.predict("共同创造美好的新世纪——二○○一年新年贺词")[0])
 
     elif unit == "perceptron-evaluate":
