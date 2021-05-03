@@ -4,6 +4,7 @@
 
 from collections import defaultdict
 import re
+import time
 
 BOS = " BOS "
 EOS = " EOS "
@@ -31,7 +32,7 @@ def read_vocabulary_dataset(filename):
 def read_bigram_words(filename):
     with open(filename, "r") as f:
         lines = f.read().splitlines()
-        lines = [l.split('  ') for l in lines]
+        lines = [l.strip().split('  ') for l in lines]
 
         uni_freq = defaultdict(int)
         for l in lines:
@@ -57,10 +58,10 @@ def export_plain_sentences(sentences, filename):
         f.write(content)
 
 
-def read_hmm_tagged_sentences(filename):
+def read_sequential_tagged_sentences(filename, convert_character_to_int=False):
     with open(filename, "r") as f:
         lines = f.read().splitlines()
-        lines = [l.split('  ') for l in lines]
+        lines = [l.strip().split('  ') for l in lines]
 
         states = []
         observations = []
@@ -68,31 +69,46 @@ def read_hmm_tagged_sentences(filename):
             s, ob = [], []
             for w in l:
                 w_len = len(w)
+                if w_len == 0:
+                    continue
                 if w_len == 1:
                     s.append(3)  # S
                 else:
                     s.extend([0, *([1] * (w_len - 2)), 2])  # B, M, ... , E
-                # ob.extend(string_to_ints(w))
-                ob.extend(w)
+                if convert_character_to_int:
+                    ob.extend(string_to_ints(w))
 
             states.append(s)
-            observations.append(ob)
+            if convert_character_to_int:
+                observations.append(ob)
 
-        return states, observations
+        if convert_character_to_int:
+            return states, observations
+        else:
+            return states, [''.join(l) for l in lines]
 
 
-def export_hmm_tagged_sentences(states, observations, filename):
+def join_sequential_tagged_sentences(states, observations, convert_int_to_character=False):
     if len(states) != len(observations):
         raise ValueError
 
     sentences = []
     for i in range(len(states)):
         sentence = ''
-        string = ints_to_string(observations[i])
+        if convert_int_to_character:
+            string = ints_to_string(observations[i])
+        else:
+            string = observations[i]
         for j in range(len(states[i])):
             tag, char = states[i][j], string[j]
-            sentence += char if tag == 0 or tag == 1 else char + '  '
+            sentence += char if tag == 0 or tag == 1 or j == len(states[i]) - 1 else char + '  '
         sentences.append(sentence)
+
+    return sentences
+
+
+def export_sequential_tagged_sentences(states, observations, filename, convert_int_to_character=False):
+    sentences = join_sequential_tagged_sentences(states, observations, convert_int_to_character)
 
     with open(filename, "w") as f:
         f.write('\n'.join(sentences))
@@ -125,3 +141,34 @@ def try_atomic_segmentation(sentence):
         return match.span()[1]
     else:
         return
+
+class Evaluator:
+    def __init__(self):
+        self.start_time = time.time()
+        self.tp, self.truth, self.predict = 0, 0, 0  # True positive
+
+    @staticmethod
+    def __convert_sentence_to_set(sentence):
+        word_set, offset = set(), 0
+        words = sentence.split('  ')
+        for w in words:
+            word_set.add((offset, w))
+
+        return word_set
+
+    def count(self, truth_sen, predict_sen):
+        truth_set = self.__convert_sentence_to_set(truth_sen)
+        predict_set = self.__convert_sentence_to_set(predict_sen)
+        tp_set = truth_set & predict_set
+
+        self.truth += len(truth_set)
+        self.predict += len(predict_set)
+        self.tp += len(tp_set)
+
+    def get_statistics(self):
+        precision = self.tp / self.predict
+        recall = self.tp / self.truth
+        f1 = 2 * self.tp / (self.truth + self.predict) if self.truth + self.predict != 0 else 0
+        elapsed_time = time.time() - self.start_time
+        formatted_string = f"P:{precision:.4} R:{recall:.4} F1:{f1:.4} {elapsed_time:.4}s"
+        return precision, recall, f1, elapsed_time, formatted_string

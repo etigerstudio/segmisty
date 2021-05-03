@@ -2,30 +2,51 @@
 # Structured Averaged Perceptron 结构化平均感知机
 # ========================================
 
-from utils import NA
+from utils import NA, Evaluator
+import json
 import utils
+import time
+
 
 class Perceptron:
-    def __init__(self):
+    def __init__(self, name=None):
         self.w = {}
         self.current_step = 0
+        self.name = name
 
-    def train(self, sentences, tag_set):
-        for i in range(10):
+    def train(self, sentences, tag_set, max_epoch=100):
+        # last_f1 = float("-inf")
+
+        for i in range(max_epoch):
             converged = True
-            # if i % 100 == 0:
-            #     print(f"iter {i} {self.predict('“吃屎的东西，连一捆麦也铡不动呀？')[0]}")
+            evaluator = Evaluator()
             for sen, tags in zip(sentences, tag_set):
                 y_predict, features = self.predict(sen)
+
+                predict_sen = utils.join_sequential_tagged_sentences([y_predict], [sen])[0]
+                truth_sen = utils.join_sequential_tagged_sentences([tags], [sen])[0]
+                evaluator.count(truth_sen, predict_sen)
+
                 if y_predict != tags:
                     converged = False
-                    # if i % 100 == 0:
-                    # print(f"iter {i}: optimizing y_predict={y_predict} y_truth={tags}")  # features={features}")
                     self.__optimize(features, tags, y_predict)
 
             if converged:
                 print(f"converged after iter {i}")
                 break
+
+            # print(f"iter:{i}")
+            _, _, f1, _, formatted_string = evaluator.get_statistics()
+            print(f"iter:{i} {formatted_string}")
+            if i % 20 == 0:
+                self.export(f"{self.name}-autosave-{time.time()}-{i + 1}.perceptron")
+            # if i >= 20 and f1 <= last_f1:
+            #     print(f"iter:{i} f1({f1}) is worsened, early-stopping triggered")
+            #     break
+            # else:
+            #     last_f1 = f1
+
+        self.export(f"{self.name}-{time.time()}-{i + 1}.perceptron")
 
     def predict(self, sentence):
         features = self.__extract_features(sentence)
@@ -42,7 +63,7 @@ class Perceptron:
 
     def __update_weight(self, feature, delta):
         for k in feature:
-            self.__update_w_k(k, delta)  # TODO: Is learning rate necessary?
+            self.__update_w_k(k, delta)
             # print(f"updated:{k} averaged:{self.__get_w_k(k)} value:{self.w[k].value} delta:{delta} accumulated:{self.w[k].accumulated}")
 
     @staticmethod
@@ -69,6 +90,9 @@ class Perceptron:
         return features
 
     def __perform_viterbi(self, sentence, features):
+        if len(sentence) == 0:
+            return []
+
         delta = [[0 for _ in range(4)] for _ in range(len(sentence))]
         psi = [[0 for _ in range(4)] for _ in range(len(sentence))]  # 0 not being used
         y = []
@@ -133,6 +157,22 @@ class Perceptron:
             self.last_step = current_step
             self.averaged_value = 0
 
+        def export(self):
+            return {
+                "value": self.value,
+                "accumulated": self.accumulated,
+                "last_step": self.last_step,
+                "averaged_value": self.averaged_value,
+            }
+
+        @classmethod
+        def load(cls, dict):
+            w = cls(dict["last_step"])
+            w.value = dict["value"]
+            w.accumulated = dict["accumulated"]
+            w.averaged_value = dict["averaged_value"]
+            return w
+
     def __update_w_k(self, k, delta):
         if k not in self.w:
             self.w[k] = Perceptron.Weight(self.current_step)
@@ -154,21 +194,19 @@ class Perceptron:
 
         return self.w[k].averaged_value
 
-        # return self.w[k].value
+    def export(self, filename):
+        obj = {"weights": {k: w.export() for k, w in self.w.items()}, "current_step": self.current_step}
+        with open(filename, "w") as f:
+            json.dump(obj, f, ensure_ascii=False)
+        print(f"saved to {filename}")
 
-perceptron = Perceptron()
-tags, _ = utils.read_hmm_tagged_sentences("small_msra_test.txt")
-sentences = utils.read_plain_sentences("small_msra_test.txt")
-perceptron.train(sentences, tags)
-print(perceptron.predict("“吃屎的东西，连一捆麦也铡不动呀？"))
-# perceptron.train(["我想吃饭", "运动真好"], [[3, 3, 0, 2], [0, 2, 3, 3]])
-# perceptron.train(["我想吃饭", "运动真好"], [[3, 3, 0, 2], [0, 1, 2, 3]])
-# perceptron.train(["我想吃饭"], [[3, 3, 0, 2]])
-# perceptron.train(["运动真好"], [[0, 2, 3, 3]])
-# perceptron.train(["运动员"], [[0, 2, 3]])
-# perceptron.train(["运动真好"], [[0, 2, 3, 3]])
-# print(perceptron.predict("我想吃饭")[0])
-# print(perceptron.predict("运动真好")[0])
-# print(perceptron.predict("运动员")[0])
-# print(perceptron.predict("我想运动")[0])
-# print(Perceptron.extract_features("迈向充满希望的新世纪——一九九八年新年讲话（附图片１张）"))
+    @classmethod
+    def load(cls, filename, name=None):
+        p = cls(name)
+
+        with open(filename, "r") as f:
+            obj = json.load(f)
+        p.w = {k: Perceptron.Weight.load(w_dict) for k, w_dict in obj["weights"].items()}
+        p.current_step = obj["current_step"]
+        print(f"loaded from {filename}")
+        return p

@@ -3,11 +3,12 @@ import mm
 import hmm
 import bigram
 import time
+import perceptron
 
 if __name__ == '__main__':
 
     start_time = time.time()
-    unit = "bigram-export"
+    unit = "perceptron-evaluate"
 
     if unit == "mm-short":
         v = utils.read_vocabulary_dataset("training_vocab.txt")
@@ -62,25 +63,25 @@ if __name__ == '__main__':
 
     elif unit == "hmm-short":
         model = hmm.HMM()
-        model.train(*utils.read_hmm_tagged_sentences("training.txt"))
+        model.train(*utils.read_sequential_tagged_sentences("training.txt", convert_character_to_int=True))
         print(model.predict([utils.string_to_ints("迈向充满希望的新世纪——一九九八年新年讲话（附图片１张）")]))
         # print(list(reversed(model.predict([utils.string_to_ints(reversed("武汉市长江大桥"))]))))
 
 
     elif unit == "hmm-train":
         model = hmm.HMM()
-        model.train(*utils.read_hmm_tagged_sentences("training.txt"))
-        _, observations = utils.read_hmm_tagged_sentences("training.txt")
+        model.train(*utils.read_sequential_tagged_sentences("training.txt", convert_character_to_int=True))
+        _, observations = utils.read_sequential_tagged_sentences("training.txt", convert_character_to_int=True)
         predicted_states = model.predict(observations)
-        utils.export_hmm_tagged_sentences(predicted_states, observations, "hmm_training_result.txt")
+        utils.export_sequential_tagged_sentences(predicted_states, observations, "hmm_training_result.txt", convert_int_to_character=True)
 
 
     elif unit == "hmm-export":
         model = hmm.HMM()
-        model.train(*utils.read_hmm_tagged_sentences("msr_training.utf8"))
-        _, observations = utils.read_hmm_tagged_sentences("msr_test.utf8")
+        model.train(*utils.read_sequential_tagged_sentences("msr_training.utf8", convert_character_to_int=True))
+        _, observations = utils.read_sequential_tagged_sentences("msr_test.utf8", convert_character_to_int=True)
         predicted_states = model.predict(observations)
-        utils.export_hmm_tagged_sentences(predicted_states, observations, "msr_hmm_result.txt")
+        utils.export_sequential_tagged_sentences(predicted_states, observations, "msr_hmm_result.txt", convert_int_to_character=True)
 
 
     elif unit == "bigram-test":
@@ -120,5 +121,44 @@ if __name__ == '__main__':
         print(utils.try_atomic_segmentation("caibian3＠peopledaily．com．cn") == 27)
         print(utils.try_atomic_segmentation("happynewyear.txt.vbs") == 20)
         print(utils.try_atomic_segmentation("AM21B") == 5)
+
+    elif unit == "perceptron-test":
+        p = perceptron.Perceptron("dummy")
+        p.train(["我想吃饭", "运动真好"], [[3, 3, 0, 2], [0, 2, 3, 3]])
+        print(p.predict("我想吃饭")[0])
+        print(p.predict("运动真好")[0])
+
+        p = perceptron.Perceptron("small_msra")
+        tags, sentences = utils.read_sequential_tagged_sentences("small_msra_test.txt")
+        p.train(sentences, tags)
+        print(p.predict("“吃屎的东西，连一捆麦也铡不动呀？")[0])
+
+    elif unit == "perceptron-load":
+        p = perceptron.Perceptron.load("mini_test.perceptron")
+        print(p.predict("“吃屎的东西，连一捆麦也铡不动呀？")[0])
+
+    elif unit == "perceptron-pku":
+        p = perceptron.Perceptron()
+        tags, sentences = utils.read_sequential_tagged_sentences("training.txt")
+        p.train(sentences, tags)
+        print(p.predict("共同创造美好的新世纪——二○○一年新年贺词")[0])
+
+    elif unit == "perceptron-evaluate":
+        p = perceptron.Perceptron.load("pku-100.perceptron")
+        tag_set, sentences = utils.read_sequential_tagged_sentences("test.txt")
+        predicted_states = []
+        evaluator = utils.Evaluator()
+        for sen, tags in zip(sentences, tag_set):
+            y_predict = p.predict(sen)[0]
+            predict_sen = utils.join_sequential_tagged_sentences([y_predict], [sen])[0]
+            truth_sen = utils.join_sequential_tagged_sentences([tags], [sen])[0]
+            predicted_states.append(y_predict)
+            evaluator.count(truth_sen, predict_sen)
+        _, _, f1, _, formatted_string = evaluator.get_statistics()
+        print(f"pku-100: {formatted_string}")
+
+        utils.export_sequential_tagged_sentences(predicted_states, sentences, "perceptron_pku_100.result.txt")
+
+
 
     print("unit: %s - %s seconds" % (unit, time.time() - start_time))
