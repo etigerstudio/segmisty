@@ -8,7 +8,7 @@ import perceptron
 if __name__ == '__main__':
 
     start_time = time.time()
-    unit = "perceptron-evaluate"
+    unit = "crfpp-result-transform"
 
     if unit == "mm-short":
         v = utils.read_vocabulary_dataset("training_vocab.txt")
@@ -144,20 +144,19 @@ if __name__ == '__main__':
         print(p.predict("共同创造美好的新世纪——二○○一年新年贺词")[0])
 
     elif unit == "perceptron-evaluate":
-        p = perceptron.Perceptron.load("pku-100.perceptron")
-        tag_set, sentences = utils.read_sequential_tagged_sentences("test.txt")
-        predicted_states = []
-        evaluator = utils.Evaluator()
-        for sen, tags in zip(sentences, tag_set):
-            y_predict = p.predict(sen)[0]
-            predict_sen = utils.join_sequential_tagged_sentences([y_predict], [sen])[0]
-            truth_sen = utils.join_sequential_tagged_sentences([tags], [sen])[0]
-            predicted_states.append(y_predict)
-            evaluator.count(truth_sen, predict_sen)
-        _, _, f1, _, formatted_string = evaluator.get_statistics()
-        print(f"pku-100: {formatted_string}")
+        p = perceptron.Perceptron.load("pku-train-61.perceptron")
+        _, _, f1, _, formatted_string = p.evaluate("test.txt", export_results=True)
+        print(f"pku-train: {formatted_string}")
 
-        utils.export_sequential_tagged_sentences(predicted_states, sentences, "perceptron_pku_100.result.txt")
+    elif unit == "crfpp-train-generate":
+        # utils.generate_crfpp_compatible_file("training.txt", "training_crfpp.txt")
+        utils.generate_crfpp_compatible_file("pku_test.utf8", "testing_crfpp.txt", with_tags=False)
+
+    elif unit == "crfpp-result-transform":
+        utils.transform_crfpp_results_to_sentences("crfpp_crf_test_result.txt", "crfpp_result.txt")
+
+    elif unit == "evaluate_prediction":
+        print(utils.evaluate_truth_and_predict("test.txt", "crfpp_result.txt")[4])
 
 
 

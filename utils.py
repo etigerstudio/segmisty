@@ -15,7 +15,8 @@ NUMBER_CHARS = set("0123456789零○〇一二两三四五六七八九十廿百�
 # 正则规则测试见https://regexr.com/5rr5u
 english_re = re.compile("^[\w－\-．.／/:;：；<=>?＜＝＞？@＠_＿\\\\]+", flags=re.ASCII)
 ENGLISH_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
+TAGS_MAP = {0: "B", 1: "M", 2: "E", 3: "S"}
+STATES_MAP = {"B": 0, "M": 1, "E": 2, "S": 3}
 
 def read_plain_sentences(filename):
     with open(filename, "r") as f:
@@ -141,6 +142,46 @@ def try_atomic_segmentation(sentence):
         return match.span()[1]
     else:
         return
+
+
+def generate_crfpp_compatible_file(input_filename, output_filename, with_tags=True):
+    tag_set, sentences = read_sequential_tagged_sentences(input_filename)
+    contents = ''
+    for tags, sen in zip(tag_set, sentences):
+        for i in range(len(tags)):
+            contents += f"{sen[i]} {TAGS_MAP[tags[i]]}\n" if with_tags else f"{sen[i]}\n"
+        contents += "\n"
+    with open(output_filename, "w") as f:
+        f.write(contents)
+
+
+def transform_crfpp_results_to_sentences(input_filename, output_filename):
+    with open(input_filename, "r") as f:
+        sections = f.read().split("\n\n")
+
+    sections = [[(c[0], c[-1]) for c in [l.split("\t") for l in s.split("\n")]] for s in sections]
+
+    states, observations = [], []
+    for s in sections:
+        states_i, observations_i = [], []
+        for observation, state in s:
+            if observation == "" or state == "":
+                continue
+            states_i.append(STATES_MAP[state])
+            observations_i.append(observation)
+        states.append(states_i)
+        observations.append(observations_i)
+
+    export_sequential_tagged_sentences(states, observations, output_filename)
+
+
+def evaluate_truth_and_predict(truth_filename, predict_filename):
+    evaluator = Evaluator()
+    with open(truth_filename, "r") as t, open(predict_filename, "r") as p:
+        for tl, pl in zip(t.read().splitlines(), p.read().splitlines()):
+            evaluator.count(tl, pl)
+    return evaluator.get_statistics()
+
 
 class Evaluator:
     def __init__(self):

@@ -219,7 +219,7 @@ class Perceptron:
             json.dump(obj, f, ensure_ascii=False)
         print(f"saved to {filename}")
 
-    def evaluate(self, filename, export_results=False):
+    def evaluate(self, filename, export_results=False, export_filename=None):
         tag_set, sentences = utils.read_sequential_tagged_sentences(filename)
         predicted_states = []
         evaluator = utils.Evaluator()
@@ -233,7 +233,7 @@ class Perceptron:
         print(f"eval {filename}: {formatted_string}")
 
         if export_results:
-            utils.export_sequential_tagged_sentences(predicted_states, sentences, "perceptron_pku_61.result.txt")
+            utils.export_sequential_tagged_sentences(predicted_states, sentences, export_filename)
 
         return p, r, f1, elapsed_time, formatted_string
 
