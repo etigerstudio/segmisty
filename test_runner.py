@@ -8,7 +8,7 @@ import perceptron
 if __name__ == '__main__':
 
     start_time = time.time()
-    unit = "crfpp-result-transform"
+    unit = "perceptron-profile"
 
     if unit == "mm-short":
         v = utils.read_vocabulary_dataset("training_vocab.txt")
@@ -144,9 +144,14 @@ if __name__ == '__main__':
         print(p.predict("共同创造美好的新世纪——二○○一年新年贺词")[0])
 
     elif unit == "perceptron-evaluate":
-        p = perceptron.Perceptron.load("pku-train-61.perceptron")
-        _, _, f1, _, formatted_string = p.evaluate("test.txt", export_results=True)
+        p = perceptron.Perceptron.load("pku-f1-0.9089-100.perceptron")
+        _, _, f1, _, formatted_string = p.evaluate("test.txt", export_results=True, export_filename="pku-f1-0.9089-100_result.txt")
         print(f"pku-train: {formatted_string}")
+
+    elif unit == "perceptron-profile":
+        p = perceptron.Perceptron.load("pku-f1-0.8864-14.perceptron")
+        tags, sentences = utils.read_sequential_tagged_sentences("training.txt")
+        p.train(sentences, tags, max_epoch=1)
 
     elif unit == "crfpp-train-generate":
         # utils.generate_crfpp_compatible_file("training.txt", "training_crfpp.txt")

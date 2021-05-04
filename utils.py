@@ -8,7 +8,8 @@ import time
 
 BOS = " BOS "
 EOS = " EOS "
-NA = "#"
+NA_STR = "#"
+NA_CODE = 0xA1AA  # in user-defined 1 of GBK encoding
 # 正则规则测试见https://regexr.com/5rqrb
 numeric_re = re.compile("^[十百千万亿]分之[零一二三四五六七八九十百千万亿]+(点[零一二三四五六七八九十])?|^[0-9零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟]+[年月日时分秒]|^[-－]?\\d+(.\\d)?[%％]?")
 NUMBER_CHARS = set("0123456789零○〇一二两三四五六七八九十廿百千万亿壹贰叁肆伍陆柒捌玖拾佰仟")
@@ -207,9 +208,9 @@ class Evaluator:
         self.tp += len(tp_set)
 
     def get_statistics(self):
-        precision = self.tp / self.predict
-        recall = self.tp / self.truth
-        f1 = 2 * self.tp / (self.truth + self.predict) if self.truth + self.predict != 0 else 0
+        precision = self.tp / self.predict if self.predict != 0 else 0.0
+        recall = self.tp / self.truth if self.truth != 0 else 0.0
+        f1 = 2 * self.tp / (self.truth + self.predict) if self.truth + self.predict != 0 else 0.0
         elapsed_time = time.time() - self.start_time
         formatted_string = f"P:{precision:.4} R:{recall:.4} F1:{f1:.4} {elapsed_time:.4}s"
         return precision, recall, f1, elapsed_time, formatted_string
