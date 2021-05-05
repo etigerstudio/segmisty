@@ -20,7 +20,8 @@ class Perceptron:
                 "regularization", \
                 "kernel", \
                 "l1_decay", \
-                "l2_decay"
+                "l2_decay", \
+                "require_averaged_weights"
 
     def __init__(self, name=None):
         self.weights = self.__generate_weight_structure(7)
@@ -33,9 +34,11 @@ class Perceptron:
         self.kernel = 0  # 0: linear 1: quadratic
         self.l1_decay = 0.0001
         self.l2_decay = 0.999
+        self.require_averaged_weights = True
 
     def train(self, sentences, tag_set, max_iter=250, kernel=0, evaluate_sentences=None, evaluate_tag_set=None, save_models=True):
         print(f"training began. current_epoch:{self.current_epoch} max_iter:{max_iter}")
+        self.require_averaged_weights = False
         for i in range(max_iter):
             converged = True
             self.current_epoch += 1
@@ -65,7 +68,9 @@ class Perceptron:
                     if self.current_epoch % 20 == 0:
                         self.export(f"{self.name}-autosave-{time.time()}-{self.current_epoch}.perceptron")
                 else:  # 动态保存在验证集上表现好的模型 Dynamically save models based on performance on validation set
+                    self.require_averaged_weights = True
                     p, r, f1, elapsed_time, formatted_string = self.evaluate(evaluate_sentences, evaluate_tag_set)
+                    self.require_averaged_weights = False
                     print(f"evaluation {self.current_epoch}: {formatted_string}")
                     if f1 > self.best_f1:
                         self.best_f1 = f1
@@ -81,6 +86,7 @@ class Perceptron:
         if save_models:
             self.export(f"{self.name}-{time.time()}-{self.current_epoch}.perceptron")
         print(f"training concluded. total iters: {self.current_epoch}.")
+        self.require_averaged_weights = True
 
     def predict(self, sentence):
         features = self.__extract_features(sentence)
@@ -179,13 +185,26 @@ class Perceptron:
     def __calc_score(self, last_tag, current_tag, feature):
         result = 0
         if self.kernel == 0:  # Linear
-            for i in range(len(feature)):
-                result += self.__get_w_k(self.weights[i][current_tag], feature[i])
-            result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True)
+            if self.require_averaged_weights:
+                for i in range(len(feature)):
+                    result += self.__get_w_k(self.weights[i][current_tag], feature[i])
+                result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True)
+            else:
+                for i in range(len(feature)):
+                    w = self.weights[i][current_tag]
+                    result += w[feature[i]].value if feature[i] in w else 0
+                result += self.weights[7][(last_tag + 1) + current_tag * 5].value
         else:  # Quadratic
-            for i in range(len(feature)):
-                result += self.__get_w_k(self.weights[i][current_tag], feature[i]) ** 2
-            result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True) ** 2
+            if self.require_averaged_weights:
+                for i in range(len(feature)):
+                    result += self.__get_w_k(self.weights[i][current_tag], feature[i]) ** 2
+                result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True) ** 2
+            else:
+                for i in range(len(feature)):
+                    w = self.weights[i][current_tag]
+                    result += w[feature[i]].value if feature[i] ** 2 in w else 0
+                result += self.weights[7][(last_tag + 1) + current_tag * 5].value ** 2
+
         return result
 
     class Weight:
@@ -224,7 +243,6 @@ class Perceptron:
         wk.value += delta
         wk.averaged_value = None
         wk.last_step = self.current_step
-
 
     def __get_w_k(self, w, k, list_based_w=False):
         if not list_based_w and k not in w:
