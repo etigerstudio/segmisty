@@ -8,7 +8,7 @@ import perceptron
 if __name__ == '__main__':
 
     start_time = time.time()
-    unit = "perceptron-profile"
+    unit = "perceptron-pku"
 
     if unit == "mm-short":
         v = utils.read_vocabulary_dataset("training_vocab.txt")
@@ -137,15 +137,28 @@ if __name__ == '__main__':
         p = perceptron.Perceptron.load("mini_test.perceptron")
         print(p.predict("“吃屎的东西，连一捆麦也铡不动呀？")[0])
 
+    elif unit == "perceptron-export-load":
+        p = perceptron.Perceptron("dummy-export")
+        p.train(["我想吃饭", "运动真好"], [[3, 3, 0, 2], [0, 2, 3, 3]])
+        print(p.predict("我想吃饭")[0])
+        print(p.predict("运动真好")[0])
+        p.export("dummy-export.perceptron")
+
+        p = None
+        p = perceptron.Perceptron.load("dummy-export.perceptron")
+        print(p.predict("我想吃饭")[0])
+        print(p.predict("运动真好")[0])
+
     elif unit == "perceptron-pku":
         p = perceptron.Perceptron()
         tags, sentences = utils.read_sequential_tagged_sentences("training.txt")
-        p.train(sentences, tags, evaluate_filename="test.txt")
+        e_tags, e_sentences = utils.read_sequential_tagged_sentences("test.txt")
+        p.train(sentences, tags, evaluate_sentences=e_sentences, evaluate_tag_set=e_tags)
         print(p.predict("共同创造美好的新世纪——二○○一年新年贺词")[0])
 
     elif unit == "perceptron-evaluate":
-        p = perceptron.Perceptron.load("pku-f1-0.9089-100.perceptron")
-        _, _, f1, _, formatted_string = p.evaluate("test.txt", export_results=True, export_filename="pku-f1-0.9089-100_result.txt")
+        p = perceptron.Perceptron.load("pku-train-f1-0.9923-250.perceptron")
+        _, _, f1, _, formatted_string = p.evaluate("training.txt", export_results=True, export_filename="pku-train-f1-0.9923-250.result.txt")
         print(f"pku-train: {formatted_string}")
 
     elif unit == "perceptron-profile":
