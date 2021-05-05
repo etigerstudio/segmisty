@@ -179,6 +179,9 @@ class Perceptron:
             self.last_step = current_step
             self.averaged_value = 0
 
+        def __repr__(self):
+            return str(self.value)
+
         def export(self):
             return {
                 "value": self.value,

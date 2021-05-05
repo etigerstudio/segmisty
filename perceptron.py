@@ -30,13 +30,15 @@ class Perceptron:
         self.regularization = 0  # 0: none 1: L1 2: L2
         self.kernel = 0  # 0: linear 1: quadratic
 
-    def train(self, sentences, tag_set, max_epoch=250, evaluate_sentences=None, evaluate_tag_set=None, save_models=True):
-        for i in range(max_epoch):
+    def train(self, sentences, tag_set, max_iter=250, evaluate_sentences=None, evaluate_tag_set=None, save_models=True):
+        print(f"training began. current_epoch:{self.current_epoch} max_iter:{max_iter}")
+        for i in range(max_iter):
             converged = True
             self.current_epoch += 1
             evaluator = Evaluator()
             for sen, tags in zip(sentences, tag_set):
                 y_predict, features = self.predict(sen)
+                # print(f"truth:{tags} predict:{y_predict}")
 
                 predict_sen = utils.join_sequential_tagged_sentences([y_predict], [sen])[0]
                 truth_sen = utils.join_sequential_tagged_sentences([tags], [sen])[0]
@@ -52,7 +54,7 @@ class Perceptron:
 
             # print(f"iter:{self.current_epoch}")
             _, _, f1, _, formatted_string = evaluator.get_statistics()
-            print(f"training iter:{self.current_epoch} {formatted_string}")
+            print(f"training iter {self.current_epoch}: {formatted_string}")
 
             if save_models:
                 if evaluate_sentences is None or evaluate_tag_set is None:
@@ -60,7 +62,7 @@ class Perceptron:
                         self.export(f"{self.name}-autosave-{time.time()}-{self.current_epoch}.perceptron")
                 else:  # 动态保存在验证集上表现好的模型 Dynamically save models based on performance on validation set
                     p, r, f1, elapsed_time, formatted_string = self.evaluate(evaluate_sentences, evaluate_tag_set)
-                    print(f"evaluation:{self.current_epoch} {formatted_string}")
+                    print(f"evaluation {self.current_epoch}: {formatted_string}")
                     if f1 > self.best_f1:
                         self.best_f1 = f1
                         save_filename = f"{self.name}-f1{f1:.4}-{time.time()}-{self.current_epoch}.perceptron"
@@ -84,15 +86,25 @@ class Perceptron:
     def __optimize(self, features, y_truth, y_predict):
         self.current_step += 1
         for i in range(len(features)):
-            if y_truth[i] != y_predict[i]:  # 奖励正确序列，惩罚错误序列 BOS: -1
-                self.__update_weight(y_truth[i] if i >= 1 else -1, y_truth[i], features[i], 1)
-                self.__update_weight(y_predict[i] if i >= 1 else -1, y_predict[i], features[i], -1)
+            # 奖励正确序列，惩罚错误序列 BOS: -1
+            # 按需优化
+            if y_truth[i] != y_predict[i]:
+                self.__update_weight(y_truth[i - 1] if i >= 1 else -1, y_truth[i], features[i], 1, True)
+                self.__update_weight(y_predict[i - 1] if i >= 1 else -1, y_predict[i], features[i], -1, True)
+            else:
+                if i >= 1 and y_truth[i - 1] != y_predict[i - 1]:
+                    self.__update_weight(y_truth[i - 1] if i >= 1 else -1, y_truth[i], features[i], 1, False)
+                    self.__update_weight(y_predict[i - 1] if i >= 1 else -1, y_predict[i], features[i], -1, False)
 
-    def __update_weight(self, last_tag, current_tag, feature, delta):
-        for i in range(len(feature)):
-            self.__update_w_k(self.weights[i][current_tag], feature[i], delta)
+    def __update_weight(self, last_tag, current_tag, feature, delta, update_unigram):
+        if update_unigram:
+            for i in range(len(feature)):
+                self.__update_w_k(self.weights[i][current_tag], feature[i], delta)
+                # print(f"updated:{feature[i]} [{i}][{current_tag}] {self.__get_w_k(self.weights[i][current_tag], feature[i])} {self.weights[i][current_tag][feature[i]].value} {delta} {self.weights[i][current_tag][feature[i]].accumulated}")
+        # else:
+        #     print(f"unigram skipped: {current_tag} {feature} {delta}")
         self.__update_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, delta, list_based_w=True)
-        # print(f"updated:{k} averaged:{self.__get_w_k(k)} value:{self.w[k].value} delta:{delta} accumulated:{self.w[k].accumulated}")
+        # print(f"updated:{last_tag}>{current_tag}:{last_tag + 1 + current_tag * 5} {self.__get_w_k(self.weights[7], last_tag + 1 + current_tag * 5)} {self.weights[7][(last_tag + 1) + current_tag * 5].value} {delta} {self.weights[7][(last_tag + 1) + current_tag * 5].accumulated}")
 
     @staticmethod
     def __extract_features(sentence):
@@ -177,7 +189,7 @@ class Perceptron:
             self.averaged_value = 0
 
         def __repr__(self):
-            return str(self.accumulated)  # show accumulated value when inspected
+            return str(self.value)  # show accumulated value when inspected
 
     def __update_w_k(self, w, k, delta, list_based_w=False):
         if not list_based_w and k not in w:
@@ -229,7 +241,7 @@ class Perceptron:
             predicted_states.append(y_predict)
             evaluator.count(truth_sen, predict_sen)
         p, r, f1, elapsed_time, formatted_string = evaluator.get_statistics()
-        print(f"eval: {formatted_string}")
+        # print(f"eval: {formatted_string}")
 
         if export_results:
             utils.export_sequential_tagged_sentences(predicted_states, sentences, export_filename)
@@ -290,6 +302,6 @@ class Perceptron:
         ]
 
     def __generate_weight_structure(self, unigram_count):
-        w = [[{} for _ in range(5)] for _ in range(unigram_count)]  # 5 = 4 states + BOS(-1)
-        w.append([Perceptron.Weight(0) for _ in range(20)])  # 20 = 5(last_tag) * 4(current_tag)
+        w = [[{} for _ in range(4)] for _ in range(unigram_count)]  # 4 states
+        w.append([Perceptron.Weight(0) for _ in range(20)])  # 20 = 5(last_tag, including BOS) * 4(current_tag)
         return w

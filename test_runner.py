@@ -164,7 +164,7 @@ if __name__ == '__main__':
     elif unit == "perceptron-profile":
         p = perceptron.Perceptron.load("pku-f1-0.8864-14.perceptron")
         tags, sentences = utils.read_sequential_tagged_sentences("training.txt")
-        p.train(sentences, tags, max_epoch=1)
+        p.train(sentences, tags, max_iter=1)
 
     elif unit == "crfpp-train-generate":
         # utils.generate_crfpp_compatible_file("training.txt", "training_crfpp.txt")
