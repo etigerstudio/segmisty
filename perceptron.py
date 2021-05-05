@@ -18,7 +18,9 @@ class Perceptron:
                 "best_f1", \
                 "saved_models", \
                 "regularization", \
-                "kernel"
+                "kernel", \
+                "l1_decay", \
+                "l2_decay"
 
     def __init__(self, name=None):
         self.weights = self.__generate_weight_structure(7)
@@ -29,8 +31,10 @@ class Perceptron:
         self.saved_models = deque()
         self.regularization = 0  # 0: none 1: L1 2: L2
         self.kernel = 0  # 0: linear 1: quadratic
+        self.l1_decay = 0.0001
+        self.l2_decay = 0.999
 
-    def train(self, sentences, tag_set, max_iter=250, evaluate_sentences=None, evaluate_tag_set=None, save_models=True):
+    def train(self, sentences, tag_set, max_iter=250, kernel=0, evaluate_sentences=None, evaluate_tag_set=None, save_models=True):
         print(f"training began. current_epoch:{self.current_epoch} max_iter:{max_iter}")
         for i in range(max_iter):
             converged = True
@@ -174,9 +178,14 @@ class Perceptron:
 
     def __calc_score(self, last_tag, current_tag, feature):
         result = 0
-        for i in range(len(feature)):
-            result += self.__get_w_k(self.weights[i][current_tag], feature[i])
-        result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True)
+        if self.kernel == 0:  # Linear
+            for i in range(len(feature)):
+                result += self.__get_w_k(self.weights[i][current_tag], feature[i])
+            result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True)
+        else:  # Quadratic
+            for i in range(len(feature)):
+                result += self.__get_w_k(self.weights[i][current_tag], feature[i]) ** 2
+            result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True) ** 2
         return result
 
     class Weight:
@@ -191,15 +200,31 @@ class Perceptron:
         def __repr__(self):
             return str(self.value)  # show accumulated value when inspected
 
+    def __regularize_wk(self, value, accumulated, steps, regularization):
+        if steps == 0:
+            return value, accumulated
+
+        if regularization == 1:  # L1
+            reg_value = max(value - steps * self.l1_decay, 0) if value > 0 else -min(value + steps * self.l1_decay, 0)
+            reg_accumulated = (value + reg_value) * min(steps, value / self.l1_decay) / 2
+        else:  # L2
+            reg_value = value * self.l2_decay ** steps
+            reg_accumulated = value * (1 - self.l2_decay ** steps) / 1 - self.l2_decay
+        return reg_value, reg_accumulated
+
     def __update_w_k(self, w, k, delta, list_based_w=False):
         if not list_based_w and k not in w:
             w[k] = Perceptron.Weight(self.current_step)
 
         wk = w[k]
-        wk.accumulated += wk.value * (self.current_step - wk.last_step)
-        wk.last_step = self.current_step
+        if self.regularization == 0:
+            wk.accumulated += wk.value * (self.current_step - wk.last_step)
+        else:
+            wk.accumulated, wk.value = self.__regularize_wk(wk.value, wk.accumulated, self.current_step - wk.last_step, self.regularization)
         wk.value += delta
         wk.averaged_value = None
+        wk.last_step = self.current_step
+
 
     def __get_w_k(self, w, k, list_based_w=False):
         if not list_based_w and k not in w:
@@ -208,9 +233,12 @@ class Perceptron:
         wk = w[k]
         if wk.last_step != self.current_step \
                 or wk.averaged_value is None:
-            wk.accumulated += wk.value * (self.current_step - wk.last_step)
-            wk.last_step = self.current_step
+            if self.regularization == 0:
+                wk.accumulated += wk.value * (self.current_step - wk.last_step)
+            else:
+                wk.accumulated, wk.value = self.__regularize_wk(wk.value, wk.accumulated, self.current_step - wk.last_step, self.regularization)
             wk.averaged_value = (wk.accumulated + wk.value) / self.current_step
+            wk.last_step = self.current_step
 
         return wk.averaged_value
 
