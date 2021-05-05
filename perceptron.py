@@ -23,20 +23,20 @@ class Perceptron:
                 "l2_decay", \
                 "require_averaged_weights"
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, kernel=0, regularization=0):
         self.weights = self.__generate_weight_structure(7)
         self.current_step = 0
         self.current_epoch = 0
         self.name = name
         self.best_f1 = 0
         self.saved_models = deque()
-        self.regularization = 0  # 0: none 1: L1 2: L2
-        self.kernel = 0  # 0: linear 1: quadratic
+        self.regularization = regularization  # 0: none 1: L1 2: L2
+        self.kernel = kernel  # 0: linear 1: quadratic
         self.l1_decay = 0.0001
         self.l2_decay = 0.999
         self.require_averaged_weights = True
 
-    def train(self, sentences, tag_set, max_iter=250, kernel=0, evaluate_sentences=None, evaluate_tag_set=None, save_models=True):
+    def train(self, sentences, tag_set, max_iter=500, evaluate_sentences=None, evaluate_tag_set=None, evaluate_frequency=10, save_models=True):
         print(f"training began. current_epoch:{self.current_epoch} max_iter:{max_iter}")
         self.require_averaged_weights = False
         for i in range(max_iter):
@@ -63,25 +63,24 @@ class Perceptron:
             _, _, f1, _, formatted_string = evaluator.get_statistics()
             print(f"training iter {self.current_epoch}: {formatted_string}")
 
-            if save_models:
-                if evaluate_sentences is None or evaluate_tag_set is None:
-                    if self.current_epoch % 20 == 0:
-                        self.export(f"{self.name}-autosave-{time.time()}-{self.current_epoch}.perceptron")
-                else:  # 动态保存在验证集上表现好的模型 Dynamically save models based on performance on validation set
-                    self.require_averaged_weights = True
-                    p, r, f1, elapsed_time, formatted_string = self.evaluate(evaluate_sentences, evaluate_tag_set)
-                    self.require_averaged_weights = False
-                    print(f"evaluation {self.current_epoch}: {formatted_string}")
-                    if f1 > self.best_f1:
-                        self.best_f1 = f1
-                        save_filename = f"{self.name}-f1{f1:.4}-{time.time()}-{self.current_epoch}.perceptron"
-                        self.saved_models.append(save_filename)
-                        self.export(save_filename)
-                        print(f"saved model f1:{f1} name:{save_filename}")
-                        if len(self.saved_models) > 5:
-                            purge_filename = self.saved_models.popleft()
-                            os.remove(purge_filename)
-                            print(f"purged model name:{purge_filename}")
+            if evaluate_sentences is None or evaluate_tag_set is None:
+                if save_models and self.current_epoch % 20 == 0:
+                    self.export(f"{self.name}-autosave-{time.time()}-{self.current_epoch}.perceptron")
+            elif (i + 1) % evaluate_frequency == 0 or i == 0 :  # 动态保存在验证集上表现好的模型 Dynamically save models based on performance on validation set
+                self.require_averaged_weights = True
+                p, r, f1, elapsed_time, formatted_string = self.evaluate(evaluate_sentences, evaluate_tag_set)
+                self.require_averaged_weights = False
+                print(f"evaluation {self.current_epoch}: {formatted_string}")
+                if save_models and f1 > self.best_f1:
+                    self.best_f1 = f1
+                    save_filename = f"{self.name}-f1-{f1:.4}-{time.time()}-{self.current_epoch}.perceptron"
+                    self.saved_models.append(save_filename)
+                    self.export(save_filename)
+                    print(f"saved model f1:{f1} name:{save_filename}")
+                    if len(self.saved_models) > 5:
+                        purge_filename = self.saved_models.popleft()
+                        os.remove(purge_filename)
+                        print(f"purged model name:{purge_filename}")
 
         if save_models:
             self.export(f"{self.name}-{time.time()}-{self.current_epoch}.perceptron")
@@ -108,9 +107,13 @@ class Perceptron:
 
     def __update_weight(self, last_tag, current_tag, feature, delta, update_unigram):
         if update_unigram:
-            for i in range(len(feature)):
-                self.__update_w_k(self.weights[i][current_tag], feature[i], delta)
-                # print(f"updated:{feature[i]} [{i}][{current_tag}] {self.__get_w_k(self.weights[i][current_tag], feature[i])} {self.weights[i][current_tag][feature[i]].value} {delta} {self.weights[i][current_tag][feature[i]].accumulated}")
+            if self.kernel == 0:
+                for i in range(len(feature)):
+                    self.__update_w_k(self.weights[i][current_tag], feature[i], delta)
+                    # print(f"updated:{feature[i]} [{i}][{current_tag}] {self.__get_w_k(self.weights[i][current_tag], feature[i])} {self.weights[i][current_tag][feature[i]].value} {delta} {self.weights[i][current_tag][feature[i]].accumulated}")
+            else:
+                for i in range(len(feature)):
+                    self.__update_w_k(self.weights[i][current_tag], feature[i], (delta * 2 * (self.weights[i][current_tag][feature[i]].value + 1)) if (feature[i] in self.weights[i][current_tag]) else delta * 2)
         # else:
         #     print(f"unigram skipped: {current_tag} {feature} {delta}")
         self.__update_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, delta, list_based_w=True)
@@ -197,13 +200,14 @@ class Perceptron:
         else:  # Quadratic
             if self.require_averaged_weights:
                 for i in range(len(feature)):
-                    result += self.__get_w_k(self.weights[i][current_tag], feature[i]) ** 2
-                result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True) ** 2
+                    result += self.__get_w_k(self.weights[i][current_tag], feature[i])
+                result += self.__get_w_k(self.weights[7], (last_tag + 1) + current_tag * 5, list_based_w=True)
             else:
                 for i in range(len(feature)):
                     w = self.weights[i][current_tag]
-                    result += w[feature[i]].value if feature[i] ** 2 in w else 0
-                result += self.weights[7][(last_tag + 1) + current_tag * 5].value ** 2
+                    result += w[feature[i]].value if feature[i] in w else 0
+                result += self.weights[7][(last_tag + 1) + current_tag * 5].value
+            result = (1 + result) ** 2
 
         return result
 
@@ -219,16 +223,16 @@ class Perceptron:
         def __repr__(self):
             return str(self.value)  # show accumulated value when inspected
 
-    def __regularize_wk(self, value, accumulated, steps, regularization):
+    def __regularize_wk(self, value, steps, regularization):
         if steps == 0:
-            return value, accumulated
+            return value, 0
 
         if regularization == 1:  # L1
             reg_value = max(value - steps * self.l1_decay, 0) if value > 0 else -min(value + steps * self.l1_decay, 0)
             reg_accumulated = (value + reg_value) * min(steps, value / self.l1_decay) / 2
         else:  # L2
             reg_value = value * self.l2_decay ** steps
-            reg_accumulated = value * (1 - self.l2_decay ** steps) / 1 - self.l2_decay
+            reg_accumulated = value * (1 - self.l2_decay ** steps) / (1 - self.l2_decay)
         return reg_value, reg_accumulated
 
     def __update_w_k(self, w, k, delta, list_based_w=False):
@@ -239,7 +243,7 @@ class Perceptron:
         if self.regularization == 0:
             wk.accumulated += wk.value * (self.current_step - wk.last_step)
         else:
-            wk.accumulated, wk.value = self.__regularize_wk(wk.value, wk.accumulated, self.current_step - wk.last_step, self.regularization)
+            wk.accumulated, wk.value = self.__regularize_wk(wk.value, self.current_step - wk.last_step, self.regularization)
         wk.value += delta
         wk.averaged_value = None
         wk.last_step = self.current_step
@@ -254,7 +258,7 @@ class Perceptron:
             if self.regularization == 0:
                 wk.accumulated += wk.value * (self.current_step - wk.last_step)
             else:
-                wk.accumulated, wk.value = self.__regularize_wk(wk.value, wk.accumulated, self.current_step - wk.last_step, self.regularization)
+                wk.accumulated, wk.value = self.__regularize_wk(wk.value, self.current_step - wk.last_step, self.regularization)
             wk.averaged_value = (wk.accumulated + wk.value) / self.current_step
             wk.last_step = self.current_step
 
