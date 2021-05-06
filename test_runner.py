@@ -8,7 +8,7 @@ import perceptron
 if __name__ == '__main__':
 
     start_time = time.time()
-    unit = "perceptron-pku"
+    unit = "perceptron-evaluate"
 
     if unit == "mm-short":
         v = utils.read_vocabulary_dataset("training_vocab.txt")
@@ -95,12 +95,18 @@ if __name__ == '__main__':
 
 
     elif unit == "bigram-export":
-        s = utils.read_plain_sentences("msr_test.utf8")
+        s = utils.read_plain_sentences("test.txt")
 
-        uni_freq, bi_freq = utils.read_bigram_words("msr_training.utf8")
+        uni_freq, bi_freq = utils.read_bigram_words("training.txt")
+
+        # start_train_time = time.time()
         bi_gram = bigram.BiGram(uni_freq, bi_freq, enable_atomic_segmentation=True)
+        # print(f"bigram train: {time.time() - start_train_time} seconds")
+
+        # start_seg_time = time.time()
         results = bi_gram.segment_sentences(s)
-        utils.export_plain_sentences(results, "msr_bigram_result.txt")
+        # print(f"bigram seg: {time.time() - start_seg_time} seconds")
+        utils.export_plain_sentences(results, "bigram_final_atomic_no_single_result.txt")
 
 
     elif unit == "atom-segmentation-test":
@@ -157,9 +163,16 @@ if __name__ == '__main__':
         print(p.predict("共同创造美好的新世纪——二○○一年新年贺词")[0])
 
     elif unit == "perceptron-evaluate":
-        p = perceptron.Perceptron.load("pku-train-f1-0.9923-250.perceptron")
-        _, _, f1, _, formatted_string = p.evaluate("training.txt", export_results=True, export_filename="pku-train-f1-0.9923-250.result.txt")
-        print(f"pku-train: {formatted_string}")
+        p = perceptron.Perceptron.load("pf-pku-new-avg-f1-0.9171-1620297988.466555-440.perceptron")
+        e_tags, e_sentences = utils.read_sequential_tagged_sentences("test.txt")
+        w_count = 0
+        for ws in p.weights:
+            for w in ws:
+                if type(w) is dict:
+                    w_count += len(w)
+        print(f"count of model parameters: {w_count+20}")
+        _, _, f1, _, formatted_string = p.evaluate(e_sentences, e_tags, export_results=True, export_filename="pf-pku-new-avg-f1-0.9171-1620297988.466555-440.result.txt")
+        print(f"pku-new-avg: {formatted_string}")
 
     elif unit == "perceptron-profile":
         p = perceptron.Perceptron.load("pku-f1-0.8864-14.perceptron")
@@ -171,7 +184,7 @@ if __name__ == '__main__':
         utils.generate_crfpp_compatible_file("pku_test.utf8", "testing_crfpp.txt", with_tags=False)
 
     elif unit == "crfpp-result-transform":
-        utils.transform_crfpp_results_to_sentences("crfpp_crf_test_result.txt", "crfpp_result.txt")
+        utils.transform_crfpp_results_to_sentences("crfpp_more_crf_result.txt", "crfpp_more_result.txt")
 
     elif unit == "evaluate_prediction":
         print(utils.evaluate_truth_and_predict("test.txt", "crfpp_result.txt")[4])
