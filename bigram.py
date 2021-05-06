@@ -51,14 +51,14 @@ class BiGram:
 
     def __calc_smoothed_probability(self, w1, w2):
         """
-        P_smoothed(w2|w1) = (1 - l) * ((1 - m) * c(w1w2) / c(w1) + m) + l * ((c(w2) + 1) / N)
+        P_smoothed(w2|w1) = (1 - l) * ((1 - m) * c(w1w2) / c(w1) + m) + l * (c(w2) / N)
         P经验平滑公式；P的总和等于1
         """
         return \
             -log((1 - self.SMOOTHING_LAMBDA) * (
-                        (1 - self.SMOOTHING_MU) * self.bi_freq[w1][w2] / (self.uni_freq[w1] + self.SMOOTHING_MU)) \
+                    (((1 - self.SMOOTHING_MU) * self.bi_freq[w1][w2] / self.uni_freq[w1]) if self.uni_freq[w1] > 0 else 0) + self.SMOOTHING_MU) \
                  + self.SMOOTHING_LAMBDA * (
-                             (self.uni_freq[w2] + 1) / (self.total_word_frequency)))  # Should + |V| or not? Not yet.
+                         self.uni_freq[w2] / self.total_word_frequency))
 
     @staticmethod
     def __dijkstra_shortest_path(graph):
